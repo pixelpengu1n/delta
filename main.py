@@ -1,10 +1,9 @@
 from fastapi import FastAPI
+from routes.greet import router as greet
 
 app = FastAPI()
 
-@app.get("/delta/greet")
-def greet():
-    return {"message": "Ahoy, World!"}
+app.include_router(greet)
 
 if __name__ == "__main__":
     import uvicorn  
