@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/greet")
+@router.get("/")
 def greet():
     return {"message": "Ahoy, World!"}
 

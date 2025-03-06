@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from routes.greet import router as greet
+from routes.yahoo_data import router as fetch
 
 app = FastAPI()
 
 app.include_router(greet)
+app.include_router(fetch)
 
 if __name__ == "__main__":
     import uvicorn  
