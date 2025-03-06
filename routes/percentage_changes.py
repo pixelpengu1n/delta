@@ -24,7 +24,7 @@ def analyze_big_events(
 ):
     # Download the data from Yahoo Finance
     data = yf.download(ticker, start=start_date, end=end_date, interval=interval)
-    
+
     # Extract the 'Close' column and reset the index
     data = data[['Close']].reset_index()
 
