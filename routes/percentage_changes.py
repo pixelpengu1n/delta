@@ -6,6 +6,14 @@ from fastapi.encoders import jsonable_encoder
 
 router = APIRouter()
 
+"""
+Large Percentage Changes: Where the price moves by more than a certain threshold within a single day or over a period of days.
+- Threshold: We use a threshold value (default 5%) to define what counts as a "big event." If the percentage change on a given day is above this threshold, we consider it a significant event.
+- Percentage Change Calculation: We calculate the percentage change in the closing price from one day to the next.
+- Filtering Big Events: We filter out the dates where the percentage change in price exceeds the threshold (either a gain or a loss).
+- Returning the Result: The API returns the filtered list of dates with the corresponding closing price and percentage change.
+"""
+
 @router.get("/data/percen_chang/")
 def analyze_big_events(
     ticker: str = Query(..., description="The stock ticker symbol."),
@@ -14,24 +22,20 @@ def analyze_big_events(
     interval: str = Query(..., description="The time interval for the data (e.g., '1m', '5d', '1wk')."),
     threshold: float = Query(5.0, description="The percentage change threshold to identify big events (default is 5%).")
 ):
-    try:
-        data = yf.download(ticker, start=start_date, end=end_date, interval=interval)
-        
-        if data.empty:
-            return JSONResponse(status_code=404, content={"error": f"No data found for {ticker} from {start_date} to {end_date} using {interval} interval."})
-        
-        data = data[['Close']].reset_index()
-        data.columns = ['Date', 'Closing Price']
-        data['Pct Change'] = data['Closing Price'].pct_change() * 100
+    # Download the data from Yahoo Finance
+    data = yf.download(ticker, start=start_date, end=end_date, interval=interval)
 
-        big_events = data[abs(data['Pct Change']) >= threshold]
+    # Extract the 'Close' column and reset the index
+    data = data[['Close']].reset_index()
 
-        if big_events.empty:
-            return JSONResponse(status_code=200, content={"message": f"No significant events detected for {ticker} from {start_date} to {end_date} at {interval} interval."})
+    # Rename the columns
+    data.columns = ['Date', 'Closing Price']
 
-        return JSONResponse(status_code=200, content={
-            "message": f"Significant changes detected for {ticker}!",
-            "events": big_events[['Date', 'Closing Price', 'Pct Change']].to_dict(orient='records')
-        })
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+    # Calculate the percentage change between consecutive days
+    data['Pct Change'] = data['Closing Price'].pct_change() * 100
+
+    # Filter for big events (percentage changes that exceed the threshold)
+    big_events = data[abs(data['Pct Change']) >= threshold]
+
+    # Return the filtered data with big events
+    return big_events[['Date', 'Closing Price', 'Pct Change']].to_dict(orient='records')
