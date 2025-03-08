@@ -4,4 +4,4 @@ router = APIRouter()
 
 @router.get("/greet")
 def greet():
-    return {"message": "Ahoy, World!"}
+    return "Welcome to Delta Finances"

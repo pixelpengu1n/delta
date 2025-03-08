@@ -14,7 +14,7 @@ Large Percentage Changes: Where the price moves by more than a certain threshold
 - Returning the Result: The API returns the filtered list of dates with the corresponding closing price and percentage change.
 """
 
-@router.get("/data/percen_chang/")
+@router.get("/event/percentage_change/")
 def analyze_big_events(
     ticker: str = Query(..., description="The stock ticker symbol."),
     start_date: str = Query(..., description="The start date for the data (format: YYYY-MM-DD)."),

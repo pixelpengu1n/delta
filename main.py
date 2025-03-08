@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from routes.greet import router as greet
 from routes.yahoo_data import router as fetch
-from routes.percentage_changes import router as percentagechange
+from routes.percentage_changes import router as percentage_change
 import yfinance as yf
 import pandas as pd
 
@@ -9,7 +9,7 @@ app = FastAPI()
 
 app.include_router(greet)
 app.include_router(fetch)
-app.include_router(percentagechange)
+app.include_router(percentage_change)
 
 @app.get("/")
 def read_root():
