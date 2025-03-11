@@ -6,4 +6,4 @@ client = TestClient(app)
 def test_greet():
     response = client.get("/greet")
     assert response.status_code == 200
-    assert response.json() == {"message": "Ahoy, World!"}
+    assert response.json() == "Welcome to Delta Finances"
