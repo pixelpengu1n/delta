@@ -5,6 +5,7 @@ from routes.percentage_changes import router as percentage_change
 from routes.price_chart import router as price_chart
 from routes.csv_export import router as csv_export
 from routes.whale_activity import router as whale_activity
+from routes.moving_avg import router as moving_avg
 
 app = FastAPI()
 
@@ -14,6 +15,7 @@ app.include_router(percentage_change)
 app.include_router(price_chart)
 app.include_router(csv_export)
 app.include_router(whale_activity)
+app.include_router(moving_avg)
 
 if __name__ == "__main__":
     import uvicorn  
