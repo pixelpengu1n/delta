@@ -7,6 +7,7 @@ from routes.csv_export import router as csv_export
 from routes.whale_activity import router as whale_activity
 from routes.moving_avg import router as moving_avg
 from routes.sentiments import router as sentiments
+from routes.predict import router as predict_router
 
 app = FastAPI()
 
@@ -18,6 +19,7 @@ app.include_router(csv_export)
 app.include_router(whale_activity)
 app.include_router(moving_avg)
 app.include_router(sentiments)
+app.include_router(predict_router)
 
 if __name__ == "__main__":
     import uvicorn  
