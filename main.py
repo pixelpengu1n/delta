@@ -8,7 +8,7 @@ from routes.whale_activity import router as whale_activity
 from routes.moving_avg import router as moving_avg
 from routes.sentiments import router as sentiments
 from routes.predict import router as predict_router
-
+from routes.preprocess import router as preprocess
 app = FastAPI()
 
 app.include_router(greet)
@@ -20,6 +20,7 @@ app.include_router(whale_activity)
 app.include_router(moving_avg)
 app.include_router(sentiments)
 app.include_router(predict_router)
+app.include_router(preprocess)
 
 if __name__ == "__main__":
     import uvicorn  
