@@ -12,6 +12,7 @@ from routes.preprocess import router as preprocess
 from routes.analytics import router as analytics
 from routes.visualisation import router as visualise
 from routes.predict import router as predict_router
+from routes.predict import router as predict_router
 from routes.preprocess import router as preprocess
 from routes.analytics import router as analytics
 from routes.visualisation import router as visualise
