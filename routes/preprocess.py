@@ -31,9 +31,12 @@ class DataPreprocessor:
                 try:
                     # Ensure time_object exists
                     event.setdefault("time_object", {"timestamp": datetime.now().isoformat(), "timezone": "UTC"})
-
+                    
                     # Standardize timestamp format
                     timestamp = event["time_object"].get("timestamp", None)
+                    if isinstance(timestamp, dict):
+                        timestamp = list(timestamp.values())[0] if timestamp else None
+                    
                     if isinstance(timestamp, str):
                         event["time_object"]["timestamp"] = self.format_timestamp(timestamp)
 
@@ -59,7 +62,7 @@ class DataPreprocessor:
             return datetime.fromisoformat(timestamp.replace("Z", "+00:00")).isoformat()
         except (ValueError, TypeError):
             try:
-                return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").isoformat()
+                return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").isoformat()
             except (ValueError, TypeError):
                 return str(timestamp)
 
