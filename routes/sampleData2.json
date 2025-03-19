@@ -1,0 +1,55 @@
+[
+    {
+      "data_source": "EuroFidai",
+      "dataset_type": "ESG",
+      "dataset_id": "Aspen_Pharmacare_Holdings_Ltd_G_unit_test_subset",
+      "time_object": {
+        "timestamp": "2025-03-10T12:34:56Z",
+        "timezone": "GMT+11"
+      },
+      "events": [
+        {
+          "time_object": {
+            "timestamp": "2017-12-31 00:00:00",
+            "duration": 0,
+            "timezone": "GMT+0"
+          },
+          "event_type": "ANALYTICEMPLOYMENTCREATION",
+          "attribute": {
+            "company": "Aspen Pharmacare Holdings Ltd",
+            "perm_id": "4295888632",
+            "metric_unit": "% growth in number of employees over last year",
+            "metric_value": "-2.94",
+            "metric_year": "2017-12-31",
+            "metric_period": "",
+            "provider_name": "Clarity AI",
+            "pillar": "G",
+            "country": "South Africa",
+            "disclosure": "CALCULATED",
+            "num_pt_obs": "366"
+          }
+        },
+        {
+          "time_object": {
+            "timestamp": "2022-12-31 00:00:00",
+            "duration": 0,
+            "timezone": "GMT+0"
+          },
+          "event_type": "ANALYTICAUDITCOMMIND",
+          "attribute": {
+            "company": "Aspen Pharmacare Holdings Ltd",
+            "perm_id": "4295888632",
+            "metric_unit": "%",
+            "metric_value": "100",
+            "metric_year": "2022-12-31",
+            "num_pt_obs": "366",
+            "metric_period": "",
+            "provider_name": "Clarity AI",
+            "pillar": "G",
+            "disclosure": "REPORTED",
+            "country": "South Africa"
+          }
+        }
+      ]
+    }
+]
