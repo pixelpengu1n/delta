@@ -84,7 +84,7 @@ def predict(
     last_known_date = datetime.strptime(end_date, "%Y-%m-%d")
     future_dates = [(last_known_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, future_days + 1)]
 
-#     # Format output with dates
-#     labeled_predictions = [{"date": date, "price": price} for date, price in zip(future_dates, predictions)]
+    # Format output with dates
+    labeled_predictions = [{"date": date, "price": price} for date, price in zip(future_dates, predictions)]
 
-#     return JSONResponse(content=jsonable_encoder({"predictions": labeled_predictions}))
+    return JSONResponse(content=jsonable_encoder({"predictions": labeled_predictions}))
