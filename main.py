@@ -15,6 +15,10 @@ app.include_router(analytics)
 # app.include_router(visualise)
 app.include_router(yahoo_analyse)
 
+@app.head("/")
+async def head_root():
+    return {}  # Return an empty response for HEAD requests
+
 if __name__ == "__main__":
     import uvicorn  
     uvicorn.run(app, host="0.0.0.0", port=8000)
