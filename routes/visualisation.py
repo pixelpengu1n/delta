@@ -1,102 +1,96 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Response
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import StreamingResponse
 import json
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import io
 
 router = APIRouter()
 
-class DataVisualiser:
-    def __init__(self, json_data):
-        self.data = json_data
-        self.df = self.convert_to_dataframe()
-    
-    def convert_to_dataframe(self):
-        records = []
-        for dataset in self.data.get("cleaned_data", []):
-            for event in dataset.get("events", []):
-                row = {
-                    "dataset_id": dataset.get("dataset_id", "Unknown"),
-                    "dataset_type": dataset.get("dataset_type", "Unknown"),
-                    "event_type": event.get("event_type", "Unknown"),
-                    "timestamp": event.get("time_object", {}).get("timestamp", None),
-                }
-                attributes = event.get("attribute", {})
-                row.update(attributes)
-                records.append(row)
-        
-        df = pd.DataFrame(records)
-        
-        # Convert timestamp column to datetime
-        if "timestamp" in df.columns:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        
-        return df.dropna(how="all", axis=1)
+class DataVisualizer:
+    def __init__(self, analysis_results):
+        self.analysis_results = analysis_results
 
-    def plot_time_series(self):
-        """Plot a time series graph for numeric attributes over time."""
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        if "timestamp" in self.df.columns and not self.df.empty:
-            plt.figure(figsize=(10, 5))
-            for col in numeric_cols:
-                plt.plot(self.df["timestamp"], self.df[col], label=col)
+    def visualize_summary_statistics(self, category, statistics):
+        fig, ax = plt.subplots(figsize=(12, 7))
+        keys = list(statistics.keys())
+        means = [statistics[k]['mean'] for k in keys]
+        medians = [statistics[k]['median'] for k in keys]
+        std_devs = [statistics[k]['std_dev'] for k in keys]
 
-            plt.xlabel("Time")
-            plt.ylabel("Value")
-            plt.legend()
-            plt.title("Time Series Data")
-            return self._save_plot()
-        return None
+        x = range(len(keys))
+        ax.bar(x, means, width=0.2, label='Mean', color='skyblue')
+        ax.bar([p + 0.2 for p in x], medians, width=0.2, label='Median', color='lightgreen')
+        ax.bar([p + 0.4 for p in x], std_devs, width=0.2, label='Std Dev', color='salmon')
 
-    def plot_histogram(self):
-        """Plot histograms for numeric attributes."""
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        if not numeric_cols.empty:
-            plt.figure(figsize=(10, 5))
-            for col in numeric_cols:
-                plt.hist(self.df[col].dropna(), bins=15, alpha=0.6, label=col)
+        ax.set_xticks([p + 0.2 for p in x])
+        ax.set_xticklabels(keys, rotation=45)
+        ax.set_title(f"Summary Statistics for {category}")
+        ax.set_ylabel("Values")
+        ax.legend()
+        plt.tight_layout()
+        return fig
 
-            plt.xlabel("Value")
-            plt.ylabel("Frequency")
-            plt.legend()
-            plt.title("Histogram of Numeric Data")
-            return self._save_plot()
-        return None
+    def visualize_event_trends(self, category, trends):
+        fig, ax = plt.subplots(figsize=(8, 5))
+        labels = ['First Event', 'Last Event']
+        times = [trends.get("first_event", "N/A"), trends.get("last_event", "N/A")]
 
-    def plot_scatter_matrix(self):
-        """Plot a scatter matrix for numeric variables."""
-        numeric_cols = self.df.select_dtypes(include=[np.number])
-        if not numeric_cols.empty and len(numeric_cols.columns) > 1:
-            pd.plotting.scatter_matrix(numeric_cols, figsize=(10, 10), diagonal="kde")
-            return self._save_plot()
-        return None
+        sns.barplot(x=labels, y=[1, 1], ax=ax, palette="viridis")
+        for idx, time in enumerate(times):
+            ax.text(idx, 0.5, time, ha='center', color='white', fontsize=12)
 
-    def _save_plot(self):
-        """Save the current Matplotlib figure to a memory buffer."""
-        buf = io.BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close()
-        buf.seek(0)
-        return buf
+        ax.set_title(f"Event Timeline for {category}")
+        ax.get_yaxis().set_visible(False)
+        plt.tight_layout()
+        return fig
 
-@router.post("/visualise/")
-def visualise_data(file: UploadFile = File(...)):
+    def generate_visualizations(self):
+        figures = []
+        for category, insights in self.analysis_results.items():
+            if insights.get("summary") and insights["summary"].get("statistics"):
+                figures.append(self.visualize_summary_statistics(category, insights["summary"]["statistics"]))
+            if insights.get("trends"):
+                figures.append(self.visualize_event_trends(category, insights["trends"]))
+        return figures
+
+@router.post("/visualize/")
+async def visualize_analysis(file: UploadFile = File(...)):
     try:
-        data = json.loads(file.file.read().decode("utf-8"))
-        visualiser = DataVisualiser(data)
+        data = json.loads(await file.read())
+        analysis_results = data.get("analysis_results", {})
+        if not analysis_results:
+            raise HTTPException(status_code=400, detail="No analysis results provided.")
 
-        # Choose which graph to return
-        img_buffer = visualiser.plot_time_series()
-        if img_buffer is None:
-            img_buffer = visualiser.plot_histogram()
-        if img_buffer is None:
-            img_buffer = visualiser.plot_scatter_matrix()
+        visualizer = DataVisualizer(analysis_results)
+        figures = visualizer.generate_visualizations()
 
-        if img_buffer:
-            return Response(content=img_buffer.read(), media_type="image/png")
-        else:
-            raise HTTPException(status_code=400, detail="No suitable visualisation available.")
+        if not figures:
+            raise HTTPException(status_code=400, detail="No visualizations could be generated.")
 
+        # Combine multiple figures into one image vertically
+        buf = io.BytesIO()
+        combined_height = sum(fig.get_size_inches()[1] for fig in figures)
+        width = max(fig.get_size_inches()[0] for fig in figures)
+
+        combined_fig, combined_ax = plt.subplots(len(figures), 1, figsize=(width, combined_height))
+
+        if len(figures) == 1:
+            combined_ax = [combined_ax]
+
+        for ax, fig in zip(combined_ax, figures):
+            canvas = fig.canvas
+            canvas.draw()
+            ax.imshow(canvas.buffer_rgba())
+            ax.axis('off')
+
+        plt.tight_layout()
+        combined_fig.savefig(buf, format='png')
+        plt.close('all')
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="image/png")
+
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON format.")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Visualisation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

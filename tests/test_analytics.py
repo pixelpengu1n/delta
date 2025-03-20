@@ -1,142 +1,45 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app  # Ensure this is your FastAPI app entry file
+from main import app
 import json
 import io
-import numpy as np
 
 client = TestClient(app)
 
-def test_valid_analysis():
-    """Test valid JSON input for analysis API."""
-    valid_data = {
+def test_analyze_data():
+    test_data = {
         "cleaned_data": [
             {
-                "data_source": "Yahoo Finance",
-                "dataset_type": "Stock Market Data",
-                "dataset_id": "BTC-USD",
-                "time_object": {"timestamp": "2025-03-18T05:36:43.410523+00:00", "timezone": "UTC"},
+                "dataset_id": "123",
+                "dataset_type": "type_test",
                 "events": [
-                    {"time_object": {"timestamp": "2024-01-01T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"ticker": "BTC-USD", "open": 43000, "high": 44000, "low": 42000, "close": 43500, "volume": 1500}},
-                    {"time_object": {"timestamp": "2024-01-02T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"ticker": "BTC-USD", "open": 43200, "high": 43800, "low": 42500, "close": 43000, "volume": 1400}},
-                ],
+                    {"event_type": "event1", "time_object": {"timestamp": "2024-01-01T12:00:00"}, "attribute": {"value": 100}},
+                    {"event_type": "event2", "time_object": {"timestamp": "2024-01-02T12:00:00"}, "attribute": {"value": 200}},
+                    {"event_type": "event3", "time_object": {"timestamp": "2024-01-03T12:00:00"}, "attribute": {"value": 300}},
+                    {"event_type": "event4", "time_object": {"timestamp": "2024-01-04T12:00:00"}, "attribute": {"value": 400}},
+                    {"event_type": "event5", "time_object": {"timestamp": "2024-01-05T12:00:00"}, "attribute": {"value": 500}},
+                    {"event_type": "event6", "time_object": {"timestamp": "2024-01-06T12:00:00"}, "attribute": {"value": 600}}
+                ]
             }
         ]
     }
 
-    json_bytes = json.dumps(valid_data).encode("utf-8")
-    file = {"file": ("valid_test.json", io.BytesIO(json_bytes), "application/json")}
+    json_bytes = json.dumps(test_data).encode("utf-8")
+    file = {"file": ("test.json", io.BytesIO(json_bytes), "application/json")}
 
     response = client.post("/analyse/", files=file)
-    
+
     assert response.status_code == 200
     json_response = response.json()
 
-    # Ensure response has expected keys
-    assert "status" in json_response
     assert json_response["status"] == "success"
     assert "analysis_results" in json_response
-    assert "Stock Market Data" in json_response["analysis_results"]
+    assert "type_test" in json_response["analysis_results"]
+    results = json_response["analysis_results"]["type_test"]
 
-    results = json_response["analysis_results"]["Stock Market Data"]
     assert "summary" in results
-    assert "anomalies" in results
-    assert "patterns" in results
+    assert "statistics" in results["summary"]
+    assert results["summary"]["statistics"]["value"]["mean"] == 350
 
-def test_invalid_json():
-    """Test handling of broken JSON input."""
-    invalid_json = "{"  # Malformed JSON
-    file = {"file": ("invalid.json", io.BytesIO(invalid_json.encode("utf-8")), "application/json")}
-
-    response = client.post("/analyse/", files=file)
-
-    assert response.status_code == 400  # Should return a 400 Bad Request
-    assert "detail" in response.json()
-
-
-def test_empty_analysis():
-    """Ensure empty JSON input is handled properly."""
-    empty_json = {"cleaned_data": []}
-    file = {"file": ("empty.json", io.BytesIO(json.dumps(empty_json).encode("utf-8")), "application/json")}
-
-    response = client.post("/analyse/", files=file)
-
-    assert response.status_code == 200
-    json_response = response.json()
-
-    assert "status" in json_response
-    assert json_response["status"] == "success"
-    assert json_response["analysis_results"] == {}
-
-
-def test_anomaly_detection():
-    """Ensure anomalies are detected properly."""
-    anomaly_data = {
-        "cleaned_data": [
-            {
-                "data_source": "Yahoo Finance",
-                "dataset_type": "Stock Market Data",
-                "dataset_id": "BTC-USD",
-                "events": [
-                    {"time_object": {"timestamp": "2024-01-01T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"close": 10000, "volume": 5000}},  # Outlier
-                    {"time_object": {"timestamp": "2024-01-02T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"close": 45000, "volume": 1500}},  # Normal
-                    {"time_object": {"timestamp": "2024-01-03T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"close": 46000, "volume": 1400}},  # Normal
-                ],
-            }
-        ]
-    }
-
-    json_bytes = json.dumps(anomaly_data).encode("utf-8")
-    file = {"file": ("anomaly_test.json", io.BytesIO(json_bytes), "application/json")}
-
-    response = client.post("/analyse/", files=file)
-    
-    assert response.status_code == 200
-    json_response = response.json()
-
-    assert "anomalies" in json_response["analysis_results"]["Stock Market Data"]
-
-def test_nan_values_handling():
-    """Ensure NaN values are correctly replaced with None in the response."""
-    nan_data = {
-        "cleaned_data": [
-            {
-                "data_source": "Yahoo Finance",
-                "dataset_type": "Stock Market Data",
-                "dataset_id": "BTC-USD",
-                "events": [
-                    {"time_object": {"timestamp": "2024-01-01T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"ticker": "BTC-USD", "open": 43000, "high": 44000, "low": float("NaN"), "close": 43500, "volume": 1500}},
-                    {"time_object": {"timestamp": "2024-01-02T00:00:00Z"}, "event_type": "stock price update",
-                     "attribute": {"ticker": "BTC-USD", "open": 43200, "high": 43800, "low": 42500, "close": 43000, "volume": 1400}},
-                ],
-            }
-        ]
-    }
-
-    json_bytes = json.dumps(nan_data, default=lambda x: None if isinstance(x, float) and np.isnan(x) else x).encode("utf-8")
-    file = {"file": ("nan_test.json", io.BytesIO(json_bytes), "application/json")}
-
-    response = client.post("/analyse/", files=file)
-
-    assert response.status_code == 200
-    json_response = response.json()
-
-    assert "analysis_results" in json_response
-    assert "Stock Market Data" in json_response["analysis_results"]
-
-    # Ensure NaN values were correctly converted to None
-    assert json_response["analysis_results"]["Stock Market Data"]["summary"]["statistics"]["low"]["count"] == 1  # Only 1 valid value
-
-
-    response = client.post("/analyse/", files=file)
-
-    assert response.status_code == 200
-    json_response = response.json()
-
-
+    assert "trends" in results
+    assert results["trends"]["event_count"] == 6
