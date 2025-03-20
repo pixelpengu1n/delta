@@ -1,20 +1,16 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import json
-import pandas as pd
-import numpy as np
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.ensemble import IsolationForest
-from sklearn.cluster import KMeans
+from datetime import datetime
 
 router = APIRouter()
 
 class DataAnalyser:
     def __init__(self, json_data):
         self.data = json_data
-        self.df = self.convert_to_dataframe()
+        self.records = self.convert_to_records()
         self.dataset_categories = self.get_dataset_categories()
     
-    def convert_to_dataframe(self):
+    def convert_to_records(self):
         records = []
         for dataset in self.data.get("cleaned_data", []):
             for event in dataset.get("events", []):
@@ -24,58 +20,138 @@ class DataAnalyser:
                     "event_type": event.get("event_type", "Unknown"),
                     "timestamp": event.get("time_object", {}).get("timestamp", None),
                 }
+                
                 attributes = event.get("attribute", {})
                 row.update(attributes)
                 records.append(row)
         
-        df = pd.DataFrame(records)
+        for record in records:
+            if record["timestamp"]:
+                try:
+                    record["timestamp"] = datetime.fromisoformat(record["timestamp"])
+                except ValueError:
+                    record["timestamp"] = None
         
-        if "timestamp" in df.columns:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        
-        return df.dropna(how='all', axis=1)
+        return records
     
     def get_dataset_categories(self):
-        return self.df["dataset_type"].unique()
+        return list(set(record["dataset_type"] for record in self.records))
     
     def analyze_by_category(self):
         results = {}
         for category in self.dataset_categories:
-            category_df = self.df[self.df["dataset_type"] == category]
-            results[category] = self.generate_analysis(category_df, category)
+            category_records = [rec for rec in self.records if rec["dataset_type"] == category]
+            results[category] = self.generate_analysis(category_records, category)
         return results
     
-    def generate_analysis(self, df, category):
-        insights = {"category": category, "summary": {}}
-        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how='all')
+    def generate_analysis(self, records, category):
+        insights = {"category": category, "summary": {}, "trends": {}, "correlations": {}, "distribution": {}, "patterns": {}}
         
-        if not numeric_df.empty:
-            insights["summary"]["statistics"] = numeric_df.describe().replace({np.nan: None}).to_dict()
-            insights["anomalies"] = self.detect_anomalies(df)
-            insights["patterns"] = self.detect_patterns(df)
+        numeric_keys = set()
+        for record in records:
+            for key, value in record.items():
+                if isinstance(value, (int, float)):
+                    numeric_keys.add(key)
+        
+        if numeric_keys:
+            insights["summary"]["statistics"] = {}
+            for key in numeric_keys:
+                values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+                if values:
+                    insights["summary"]["statistics"][key] = {
+                        "min": min(values),
+                        "max": max(values),
+                        "mean": sum(values) / len(values),
+                        "median": sorted(values)[len(values) // 2],
+                        "std_dev": (sum((x - sum(values) / len(values)) ** 2 for x in values) / len(values)) ** 0.5
+                    }
+        
+        insights["trends"] = self.detect_trends(records)
+        insights["correlations"] = self.detect_correlations(records, numeric_keys)
+        insights["distribution"] = self.detect_distribution(records, numeric_keys)
+        insights["patterns"] = self.detect_patterns(records)
+        insights["anomalies"] = self.detect_anomalies(records)
         
         return insights
     
-    def detect_anomalies(self, df):
-        if "close" in df.columns:
-            df = df[["close"]].dropna()
-            
-            if len(df) > 10:
-                iso_forest = IsolationForest(contamination=0.05, random_state=42)
-                df["anomaly"] = iso_forest.fit_predict(df)
-                anomalies = df[df["anomaly"] == -1]
-                return anomalies.to_dict()
-        return {}
+    def detect_anomalies(self, records):
+        anomalies = {}
+        numeric_keys = set()
+        for record in records:
+            for key, value in record.items():
+                if isinstance(value, (int, float)):
+                    numeric_keys.add(key)
+        
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if len(values) > 5:
+                mean_val = sum(values) / len(values)
+                std_dev = (sum((x - mean_val) ** 2 for x in values) / len(values)) ** 0.5
+                anomalies[key] = [rec for rec in records if rec.get(key) and abs(rec[key] - mean_val) > 2 * std_dev]
+        
+        return anomalies
     
-    def detect_patterns(self, df):
-        if "close" in df.columns:
-            df = df[["close"]].dropna()
-            
-            if len(df) > 10:
-                kmeans = KMeans(n_clusters=2, random_state=42)
-                df["pattern"] = kmeans.fit_predict(df)
-                return df["pattern"].value_counts().to_dict()
-        return {}
+    def detect_patterns(self, records):
+        patterns = {}
+        numeric_keys = set()
+        for record in records:
+            for key, value in record.items():
+                if isinstance(value, (int, float)):
+                    numeric_keys.add(key)
+        
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if len(values) > 5:
+                median_val = sorted(values)[len(values) // 2]
+                patterns[key] = {
+                    "low_count": sum(1 for x in values if x < median_val),
+                    "high_count": sum(1 for x in values if x >= median_val),
+                    "trend": "increasing" if values[-1] > values[0] else "decreasing" if values[-1] < values[0] else "stable"
+                }
+        
+        return patterns
+    
+    def detect_trends(self, records):
+        trends = {}
+        timestamps = [rec["timestamp"] for rec in records if rec["timestamp"]]
+        timestamps.sort()
+        
+        if timestamps:
+            trends["first_event"] = timestamps[0].isoformat()
+            trends["last_event"] = timestamps[-1].isoformat()
+            trends["event_count"] = len(timestamps)
+        
+        return trends
+    
+    def detect_correlations(self, records, numeric_keys):
+        correlations = {}
+        for key1 in numeric_keys:
+            for key2 in numeric_keys:
+                if key1 != key2:
+                    values1 = [rec[key1] for rec in records if key1 in rec and isinstance(rec[key1], (int, float))]
+                    values2 = [rec[key2] for rec in records if key2 in rec and isinstance(rec[key2], (int, float))]
+                    
+                    if len(values1) == len(values2) and len(values1) > 5:
+                        correlation = sum(a * b for a, b in zip(values1, values2)) / len(values1)
+                        correlations[f"{key1}-{key2}"] = correlation
+        
+        return correlations
+    
+    def detect_distribution(self, records, numeric_keys):
+        distribution = {}
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if values:
+                distribution[key] = {
+                    "min": min(values),
+                    "max": max(values),
+                    "quartiles": {
+                        "Q1": sorted(values)[len(values) // 4],
+                        "Q2": sorted(values)[len(values) // 2],
+                        "Q3": sorted(values)[(3 * len(values)) // 4]
+                    }
+                }
+        return distribution
     
     def run_analysis(self):
         return self.analyze_by_category()
@@ -85,7 +161,6 @@ def analyze_data(file: UploadFile = File(...)):
     try:
         data = json.loads(file.file.read().decode("utf-8"))
 
-        # If cleaned_data is empty, return an empty result instead of an error
         if not data.get("cleaned_data", []):
             return {"status": "success", "analysis_results": {}}
 
