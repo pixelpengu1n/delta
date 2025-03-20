@@ -23,7 +23,7 @@ def get_data(
     # Convert index to a datetime column
     data.reset_index(inplace=True)
     
-    # Ensure the Date column is properly formatted as a string
+    # Ensure the timestamp is properly formatted as an ISO string
     data["Date"] = pd.to_datetime(data["Date"], errors='coerce').dt.strftime('%Y-%m-%dT%H:%M:%SZ')
     
     # Convert data to follow the ADAGE3 event data model
@@ -39,22 +39,30 @@ def get_data(
     }
     
     for _, row in data.iterrows():
+        # Ensure all attributes are properly formatted as single values
+        attributes = {
+            "ticker": ticker,
+            "open": row.get("Open", None),
+            "high": row.get("High", None),
+            "low": row.get("Low", None),
+            "close": row.get("Close", None),
+            "volume": row.get("Volume", None)
+        }
+
+        # If attributes contain a nested dictionary with an empty string as a key, extract the value
+        for key, value in attributes.items():
+            if isinstance(value, dict) and "" in value:
+                attributes[key] = value[""]
+
         event = {
             "time_object": {
-                "timestamp": row["Date"],
+                "timestamp": {"": row["Date"]},  # Ensure the timestamp follows the expected format
                 "duration": 1,
                 "duration_unit": interval,
                 "timezone": "UTC"
             },
             "event_type": "stock price update",
-            "attribute": {
-                "ticker": ticker,
-                "open": row.get("Open", None),
-                "high": row.get("High", None),
-                "low": row.get("Low", None),
-                "close": row.get("Close", None),
-                "volume": row.get("Volume", None)
-            }
+            "attribute": attributes
         }
         json_response["events"].append(event)
     
