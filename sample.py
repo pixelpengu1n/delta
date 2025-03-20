@@ -1,8 +1,9 @@
 import requests
 import json
 
-# AWS API Gateway Endpoint
-API_URL = "https://h0gn7fm71g.execute-api.ap-southeast-2.amazonaws.com/dev/preprocess"
+# AWS API Gateway Endpoints
+PREPROCESS_URL = "https://h0gn7fm71g.execute-api.ap-southeast-2.amazonaws.com/dev/preprocess"
+ANALYSE_URL = "https://h0gn7fm71g.execute-api.ap-southeast-2.amazonaws.com/dev/analyse"
 
 # Retrieved JSON data (example)
 retrieved_data = [
@@ -31,16 +32,28 @@ retrieved_data = [
     }
 ]
 
-# Convert JSON data to string and send to AWS API Gateway
-response = requests.post(
-    API_URL,
+# Convert JSON data to string and send to AWS API Gateway for preprocessing
+preprocess_response = requests.post(
+    PREPROCESS_URL,
     headers={"Content-Type": "application/json"},
-    data=json.dumps(retrieved_data)  # Convert Python object to JSON string
+    data=json.dumps(retrieved_data)
 )
 
-# Get the response data
-if response.status_code == 200:
-    preprocessed_data = response.json()  # Convert response to dictionary
+if preprocess_response.status_code == 200:
+    preprocessed_data = preprocess_response.json()  # Convert response to dictionary
     print("Preprocessed Data Received:", json.dumps(preprocessed_data, indent=4))
+    
+    # Send preprocessed data directly to analysis endpoint
+    analyse_response = requests.post(
+        ANALYSE_URL,
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(preprocessed_data)
+    )
+    
+    if analyse_response.status_code == 200:
+        analysed_data = analyse_response.json()
+        print("Analysed Data Received:", json.dumps(analysed_data, indent=4))
+    else:
+        print(f"Error during analysis: {analyse_response.status_code}, {analyse_response.text}")
 else:
-    print(f"Error: {response.status_code}, {response.text}")
+    print(f"Error during preprocessing: {preprocess_response.status_code}, {preprocess_response.text}")

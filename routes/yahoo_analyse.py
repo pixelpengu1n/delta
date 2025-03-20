@@ -1,122 +1,157 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException
 import json
-import pandas as pd
-import numpy as np
-import requests
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.ensemble import IsolationForest
-from sklearn.cluster import KMeans
-from textblob import TextBlob
-import yfinance as yf
+from datetime import datetime
 
 router = APIRouter()
 
-# GNEWS_API_KEY = "484af3c7216b19781fcf2bc830e3628e"
-# GNEWS_BASE_URL = "https://gnews.io/api/v4/search"
-
-class DataAnalyser:
+class YahooDataAnalyser:
     def __init__(self, json_data):
         self.data = json_data
-        self.df = self.convert_to_dataframe()
+        self.records = self.convert_to_records()
         self.dataset_categories = self.get_dataset_categories()
     
-    def convert_to_dataframe(self):
+    def convert_to_records(self):
         records = []
         for dataset in self.data.get("cleaned_data", []):
             for event in dataset.get("events", []):
                 row = {
-                    "dataset_id": dataset.get("dataset_id", "Unknown"),
-                    "dataset_type": dataset.get("dataset_type", "Unknown"),
-                    "event_type": event.get("event_type", "Unknown"),
-                    "timestamp": event.get("time_object", {}).get("timestamp", None)  
+                    "ticker": event.get("attribute", {}).get("ticker", "Unknown"),
+                    "timestamp": event.get("time_object", {}).get("timestamp", None),
+                    "open": event.get("attribute", {}).get("open", None),
+                    "high": event.get("attribute", {}).get("high", None),
+                    "low": event.get("attribute", {}).get("low", None),
+                    "close": event.get("attribute", {}).get("close", None),
+                    "volume": event.get("attribute", {}).get("volume", None),
                 }
-                attributes = event.get("attribute", {})
-                row.update(attributes)
+                
+                if row["timestamp"]:
+                    try:
+                        row["timestamp"] = datetime.fromisoformat(row["timestamp"])
+                    except ValueError:
+                        row["timestamp"] = None
+                
                 records.append(row)
-
-        df = pd.DataFrame(records)
-
-        if "timestamp" in df.columns:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-
-        return df.dropna(how='all', axis=1)  
-
-    def get_dataset_categories(self):
-        return self.df["dataset_type"].unique()
+        
+        return records
     
-    def analyze_by_category(self):
+    def get_dataset_categories(self):
+        return list(set(record["ticker"] for record in self.records))
+    
+    def analyze_by_ticker(self):
         results = {}
-        for category in self.dataset_categories:
-            category_df = self.df[self.df["dataset_type"] == category]
-            results[category] = self.generate_analysis(category_df, category)
+        for ticker in self.dataset_categories:
+            ticker_records = [rec for rec in self.records if rec["ticker"] == ticker]
+            results[ticker] = self.generate_analysis(ticker_records, ticker)
         return results
     
-    def generate_analysis(self, df, category):
-        insights = {"category": category, "summary": {}}
-        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how='all')
+    def generate_analysis(self, records, ticker):
+        insights = {"ticker": ticker, "summary": {}, "trends": {}, "correlations": {}, "distribution": {}, "patterns": {}, "anomalies": {}}
         
-        if not numeric_df.empty:
-            insights["summary"]["statistics"] = numeric_df.describe().replace({np.nan: None}).to_dict()
-            insights["anomalies"] = self.detect_anomalies(df)
-            insights["patterns"] = self.detect_patterns(df)
-            insights["percentage_changes"] = self.detect_percentage_changes(df)
-            insights["moving_averages"] = self.calculate_moving_averages(df, window=14, method="EMA")
+        numeric_keys = {"open", "high", "low", "close", "volume"}
+        
+        insights["summary"]["statistics"] = {}
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if values:
+                insights["summary"]["statistics"][key] = {
+                    "min": min(values),
+                    "max": max(values),
+                    "mean": sum(values) / len(values),
+                    "median": sorted(values)[len(values) // 2],
+                    "std_dev": (sum((x - sum(values) / len(values)) ** 2 for x in values) / len(values)) ** 0.5
+                }
+        
+        insights["trends"] = self.detect_trends(records)
+        insights["correlations"] = self.detect_correlations(records, numeric_keys)
+        insights["distribution"] = self.detect_distribution(records, numeric_keys)
+        insights["patterns"] = self.detect_patterns(records)
+        insights["anomalies"] = self.detect_anomalies(records)
         
         return insights
     
-    def detect_anomalies(self, df):
-        if "volume" in df.columns:
-            df = df[["volume"]].dropna()  
-            
-            if len(df) > 10:
-                iso_forest = IsolationForest(contamination=0.05, random_state=42)
-                df["anomaly"] = iso_forest.fit_predict(df)
-                anomalies = df[df["anomaly"] == -1]
-                return anomalies.to_dict(orient="records")
+    def detect_anomalies(self, records):
+        anomalies = {}
+        numeric_keys = {"open", "high", "low", "close", "volume"}
         
-        return {}
-
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if len(values) > 5:
+                mean_val = sum(values) / len(values)
+                std_dev = (sum((x - mean_val) ** 2 for x in values) / len(values)) ** 0.5
+                anomalies[key] = [rec for rec in records if rec.get(key) and abs(rec[key] - mean_val) > 2 * std_dev]
+        
+        return anomalies
     
-    def detect_patterns(self, df):
-        if "close" in df.columns:
-            df = df[["close"]].dropna()
-            
-            if len(df) > 10:
-                kmeans = KMeans(n_clusters=2, random_state=42)
-                df["pattern"] = kmeans.fit_predict(df)
-                return df["pattern"].value_counts().to_dict()
-        return {}
+    def detect_patterns(self, records):
+        patterns = {}
+        numeric_keys = {"open", "high", "low", "close", "volume"}
+        
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if len(values) > 5:
+                median_val = sorted(values)[len(values) // 2]
+                patterns[key] = {
+                    "low_count": sum(1 for x in values if x < median_val),
+                    "high_count": sum(1 for x in values if x >= median_val),
+                    "trend": "increasing" if values[-1] > values[0] else "decreasing" if values[-1] < values[0] else "stable"
+                }
+        
+        return patterns
     
-    def detect_percentage_changes(self, df, threshold=5.0):
-        if "close" in df.columns:
-            df = df[["timestamp", "close"]].dropna()
-            df["Pct Change"] = df["close"].pct_change() * 100
-            big_events = df[abs(df["Pct Change"]) >= threshold]
-            return big_events.to_dict(orient="records")
-        return {}
+    def detect_trends(self, records):
+        trends = {}
+        timestamps = [rec["timestamp"] for rec in records if rec["timestamp"]]
+        timestamps.sort()
+        
+        if timestamps:
+            trends["first_event"] = timestamps[0].isoformat()
+            trends["last_event"] = timestamps[-1].isoformat()
+            trends["event_count"] = len(timestamps)
+        
+        return trends
     
-    def calculate_moving_averages(self, df, window=14, method="EMA"):
-        if "close" in df.columns:
-            if method.upper() == "EMA":
-                df[f"EMA_{window}"] = df["close"].ewm(span=window, adjust=False).mean()
-            else:
-                df[f"SMA_{window}"] = df["close"].rolling(window=window).mean()
-            return df.to_dict(orient="records")
-        return {}
+    def detect_correlations(self, records, numeric_keys):
+        correlations = {}
+        for key1 in numeric_keys:
+            for key2 in numeric_keys:
+                if key1 != key2:
+                    values1 = [rec[key1] for rec in records if key1 in rec and isinstance(rec[key1], (int, float))]
+                    values2 = [rec[key2] for rec in records if key2 in rec and isinstance(rec[key2], (int, float))]
+                    
+                    if len(values1) == len(values2) and len(values1) > 5:
+                        correlation = sum(a * b for a, b in zip(values1, values2)) / len(values1)
+                        correlations[f"{key1}-{key2}"] = correlation
+        
+        return correlations
+    
+    def detect_distribution(self, records, numeric_keys):
+        distribution = {}
+        for key in numeric_keys:
+            values = [rec[key] for rec in records if key in rec and isinstance(rec[key], (int, float))]
+            if values:
+                distribution[key] = {
+                    "min": min(values),
+                    "max": max(values),
+                    "quartiles": {
+                        "Q1": sorted(values)[len(values) // 4],
+                        "Q2": sorted(values)[len(values) // 2],
+                        "Q3": sorted(values)[(3 * len(values)) // 4]
+                    }
+                }
+        return distribution
     
     def run_analysis(self):
-        results = self.analyze_by_category()
-        return results
+        return self.analyze_by_ticker()
 
-@router.post("/data/analyse/")
-def analyze_data(file: UploadFile = File(...)):
+@router.post("/analyse_yahoo/")
+def analyze_yahoo_data(file: UploadFile = File(...)):
     try:
         data = json.loads(file.file.read().decode("utf-8"))
         
         if not data.get("cleaned_data", []):
             return {"status": "success", "analysis_results": {}}
         
-        analyzer = DataAnalyser(data)
+        analyzer = YahooDataAnalyser(data)
         results = analyzer.run_analysis()
         return {"status": "success", "analysis_results": results}
     except Exception as e:
