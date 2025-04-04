@@ -1,26 +1,42 @@
-# Create venv and install requirements
+# ---------- Linux/Mac ----------
 install:
-	if not exist .venv\Scripts\python.exe python -m venv .venv
+	@if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
+	. .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+
+format:
+	. .venv/bin/activate && black . && isort .
+
+lint:
+	. .venv/bin/activate && flake8 .
+
+test:
+	. .venv/bin/activate && pytest --disable-warnings
+
+coverage:
+	. .venv/bin/activate && pytest --cov=src tests/ --cov-report=term-missing
+
+done:
+	rm -rf .venv
+
+
+# ---------- Windows ----------
+installw:
+	if not exist .venv (python -m venv .venv)
 	.venv\Scripts\python.exe -m pip install --upgrade pip
 	.venv\Scripts\python.exe -m pip install -r requirements.txt
 
-# Run formatting tools
-format:
+formatw:
 	.venv\Scripts\python.exe -m black .
 	.venv\Scripts\python.exe -m isort .
 
-# Lint using flake8
-lint:
+lintw:
 	.venv\Scripts\python.exe -m flake8 .
 
-# Run all tests
-test:
+testw:
 	.venv\Scripts\python.exe -m pytest --disable-warnings
 
-# Run coverage
-coverage:
+coveragew:
 	.venv\Scripts\python.exe -m pytest --cov=src tests/ --cov-report=term-missing
 
-# Delete venv
-done:
-	rmdir /S /Q .venv
+donew:
+	rmdir /s /q .venv
