@@ -4,15 +4,12 @@ Follow these steps after cloning or pulling the repository to set up and run the
 ✅ 1. Create and activate virtual environment (recommended)
 
 Windows (PowerShell)
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+make install
+.venv\Scripts\activate
 
 macOS / Linux / WSL / Git Bash
-python3 -m venv .venv
+make install
 source .venv/bin/activate
-
-📦 2. Install dependencies
-pip install -r requirements.txt
 
 ▶️ 3. Run the FastAPI program
 uvicorn src.lambda_function:app --reload

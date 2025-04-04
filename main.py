@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 
-from routes.greet import router as greet
-from routes.preprocess import router as preprocess
-from routes.analytics import router as analytics
-from routes.yahoo_analyse import router as yahoo_analyse
-from routes.yahoo_data import router as retrieve
-from routes.collection import router as collection
+from src.routes.analytics import router as analytics
+from src.routes.collection import router as collection
+from src.routes.greet import router as greet
+from src.routes.preprocess import router as preprocess
+from src.routes.yahoo_analyse import router as yahoo_analyse
+from src.routes.yahoo_data import router as retrieve
+
 # from routes.visualisation import router as visualise
 
 app = FastAPI()
@@ -19,10 +20,13 @@ app.include_router(retrieve)
 app.include_router(collection)
 # app.include_router(visualise)
 
+
 @app.head("/")
 async def head_root():
     return {}  # Return an empty response for HEAD requests
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
