@@ -1,10 +1,12 @@
-import pandas as pd
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from typing import Optional
 
+import pandas as pd
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+
 router = APIRouter()
+
 
 @router.post("/collect/")
 async def collect_csv_data(
@@ -15,7 +17,7 @@ async def collect_csv_data(
     event_type_column: Optional[str] = Query(None),
     duration: int = Query(1),
     duration_unit: str = Query("day"),
-    timezone: str = Query("UTC")
+    timezone: str = Query("UTC"),
 ):
     """
     Endpoint to receive a CSV file and return a structured AGADE JSON object.
@@ -50,16 +52,18 @@ async def collect_csv_data(
                 if k not in [timestamp_column, event_type_column]
             }
 
-            events.append({
-                "time_object": {
-                    "timestamp": formatted_ts,
-                    "duration": duration,
-                    "duration_unit": duration_unit,
-                    "timezone": timezone
-                },
-                "event_type": str(event_type),
-                "attribute": attribute
-            })
+            events.append(
+                {
+                    "time_object": {
+                        "timestamp": formatted_ts,
+                        "duration": duration,
+                        "duration_unit": duration_unit,
+                        "timezone": timezone,
+                    },
+                    "event_type": str(event_type),
+                    "attribute": attribute,
+                }
+            )
 
         # Create final AGADE-formatted dataset
         dataset_id = str(uuid.uuid4())
@@ -68,15 +72,11 @@ async def collect_csv_data(
             "data_source": data_source,
             "dataset_type": dataset_type,
             "dataset_id": dataset_id,
-            "time_object": {
-                "timestamp": now,
-                "timezone": "UTC"
-            },
-            "events": events
+            "time_object": {"timestamp": now, "timezone": "UTC"},
+            "events": events,
         }
 
         return agade_dataset
-
 
     except pd.errors.EmptyDataError:
         raise HTTPException(status_code=400, detail="CSV file is empty or invalid.")
