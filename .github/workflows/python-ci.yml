@@ -1,0 +1,37 @@
+name: CI - Lint, Test, Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Set up virtual environment and install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 pytest pytest-cov
+
+      - name: Run Linter (flake8)
+        run: make lint
+
+      - name: Run Tests
+        run: make test
+
+      - name: Run Coverage
+        run: make coverage

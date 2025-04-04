@@ -1,10 +1,11 @@
 import json
-import pandas as pd
 from datetime import datetime
+
 import numpy as np
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 router = APIRouter()
+
 
 class DataPreprocessor:
     def __init__(self, json_data):
@@ -30,15 +31,20 @@ class DataPreprocessor:
             for event in dataset["events"]:
                 try:
                     # Ensure time_object exists
-                    event.setdefault("time_object", {"timestamp": datetime.now().isoformat(), "timezone": "UTC"})
-                    
+                    event.setdefault(
+                        "time_object",
+                        {"timestamp": datetime.now().isoformat(), "timezone": "UTC"},
+                    )
+
                     # Standardize timestamp format
                     timestamp = event["time_object"].get("timestamp", None)
                     if isinstance(timestamp, dict):
                         timestamp = list(timestamp.values())[0] if timestamp else None
-                    
+
                     if isinstance(timestamp, str):
-                        event["time_object"]["timestamp"] = self.format_timestamp(timestamp)
+                        event["time_object"]["timestamp"] = self.format_timestamp(
+                            timestamp
+                        )
 
                     # Clean event attributes
                     event.setdefault("attribute", {})
@@ -72,9 +78,13 @@ class DataPreprocessor:
         cleaned_attributes = {}
         for k, v in attributes.items():
             if v is None or v == "":
-                cleaned_attributes[k] = None  # Replace NaN with None for JSON compatibility
+                cleaned_attributes[k] = (
+                    None  # Replace NaN with None for JSON compatibility
+                )
             elif isinstance(v, dict):
-                cleaned_attributes[k] = list(v.values())[0] if v else None  # Extract nested values
+                cleaned_attributes[k] = (
+                    list(v.values())[0] if v else None
+                )  # Extract nested values
             elif isinstance(v, str) and v.replace(".", "").replace("-", "").isdigit():
                 try:
                     cleaned_attributes[k] = float(v)  # Convert numeric strings to float
@@ -86,6 +96,7 @@ class DataPreprocessor:
                 cleaned_attributes[k] = v
         return cleaned_attributes
 
+
 @router.post("/preprocess/")
 async def process_json(file: UploadFile = File(...)):
     """Endpoint to receive a JSON file, process it, and return cleaned data."""
@@ -96,7 +107,12 @@ async def process_json(file: UploadFile = File(...)):
         cleaned_data = preprocessor.clean_data()
 
         # Ensure NaN values are replaced with None for JSON serialization
-        cleaned_data = json.loads(json.dumps(cleaned_data, default=lambda x: None if isinstance(x, float) and np.isnan(x) else x))
+        cleaned_data = json.loads(
+            json.dumps(
+                cleaned_data,
+                default=lambda x: None if isinstance(x, float) and np.isnan(x) else x,
+            )
+        )
 
         return {"cleaned_data": cleaned_data}
     except HTTPException as e:

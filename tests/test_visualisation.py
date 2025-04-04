@@ -66,4 +66,3 @@
 #     response = client.post("/visualise/")
 
 #     assert response.status_code == 422  # FastAPI expects a file, so it should return 422
-

@@ -1,0 +1,52 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout source code
+      uses: actions/checkout@v3
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 📦 Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: ✅ Run Tests
+      run: pytest tests/ --disable-warnings
+
+    - name: ☁️ Set up AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+    - name: 🛠️ Install AWS SAM CLI
+      run: |
+        pip install aws-sam-cli
+
+    - name: 🧱 Build with SAM
+      run: sam build
+
+    - name: 🚀 Deploy with SAM
+      run: |
+        sam deploy \
+          --no-confirm-changeset \
+          --no-fail-on-empty-changeset \
+          --stack-name delta-app \
+          --capabilities CAPABILITY_IAM \
+          --region ${{ secrets.AWS_REGION || 'us-east-1' }}
