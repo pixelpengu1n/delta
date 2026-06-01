@@ -3,7 +3,7 @@ uvicorn==0.34.0
 yfinance==0.2.54
 pandas==2.2.3
 numpy==1.26.4
-python-multipart==0.0.20
+python-multipart==0.0.27
 aws-sam-cli==1.108.0
 flake8==7.0.0
 pytest-cov==6.1.0
